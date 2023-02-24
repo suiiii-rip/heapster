@@ -125,6 +125,7 @@ library RedBlackTreeLib {
     }
 
     function insert(Tree storage self, uint256 value) internal {
+        require(value > 0, "RBT: value must be larger than 0");
         require(!contains(self, value), "RBT: Tree contains value");
 
         self.size++;

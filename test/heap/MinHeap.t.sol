@@ -72,15 +72,9 @@ contract MinHeapTest is Test {
         assertEq(heap.length(), 0, "heap empty");
     }
 
-    function testInsertAndPopArray() public {
-        uint256[10] memory input = [uint256(10), 4, 7, 9, 9, 3, 1, 2, 8, 4];
-
-        for (uint256 i = 0; i < input.length; i++) {
-            heap.push(input[i]);
-        }
-
+    function checkOrdering(uint256 count) private {
         uint256 prev = 0;
-        for (uint256 i = 0; i < input.length; i++) {
+        for (uint256 i = 0; i < count; i++) {
             uint256 res = heap.pop();
             assertGe(res, prev);
             prev = res;
@@ -88,18 +82,39 @@ contract MinHeapTest is Test {
         assertEq(heap.length(), 0, "heap empty");
     }
 
+    function testInsertAndPopArray() public {
+        uint256[10] memory input = [uint256(10), 4, 7, 9, 9, 3, 1, 2, 8, 4];
+
+        for (uint256 i = 0; i < input.length; i++) {
+            heap.push(input[i]);
+        }
+
+        checkOrdering(input.length);
+    }
+
+    function testInsertAndPop_seq() public {
+        uint256 count = 10000;
+        for (uint256 i = 0; i < count; i++) {
+            heap.push(i);
+        }
+
+        checkOrdering(count);
+    }
+
+    function testInsertAndPop_invseq() public {
+        uint256 count = 10000;
+        for (uint256 i = count; i > 0; i--) {
+            heap.push(i);
+        }
+
+        checkOrdering(count);
+    }
+
     function testPushPop(uint256[] calldata input) public {
         for (uint256 i = 0; i < input.length; i++) {
             heap.push(input[i]);
         }
 
-        uint256 prev = 0;
-        for (uint256 i = 0; i < input.length; i++) {
-            uint256 res = heap.pop();
-            emit log_named_uint("popped ", res);
-            assertGe(res, prev);
-            prev = res;
-        }
-        assertEq(heap.length(), 0, "heap empty");
+        checkOrdering(input.length);
     }
 }
