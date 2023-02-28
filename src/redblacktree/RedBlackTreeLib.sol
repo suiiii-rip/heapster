@@ -134,6 +134,74 @@ library RedBlackTreeLib {
         return parent;
     }
 
+    function rotateLeft(Tree storage self, uint256 node) private {
+        uint256 child = self.nodes[node].right;
+        uint256 parent = self.nodes[node].parent;
+        uint256 grandchild = self.nodes[child].left;
+        self.nodes[node].right = grandchild;
+        if (grandchild != NIL) {
+            self.nodes[grandchild].parent = node;
+        }
+        self.nodes[child].parent = parent;
+        if (parent == NIL) {
+            self.root = child;
+        } else if (node == self.nodes[parent].left) {
+            self.nodes[parent].left = child;
+        } else {
+            self.nodes[parent].right = child;
+        }
+        self.nodes[child].left = node;
+        self.nodes[node].parent = child;
+    }
+
+    function rotateRight(Tree storage self, uint256 node) private {
+        uint256 child = self.nodes[node].left;
+        uint256 parent = self.nodes[node].parent;
+        uint256 grandchild = self.nodes[child].right;
+        self.nodes[node].left = grandchild;
+        if (grandchild != NIL) {
+            self.nodes[grandchild].parent = node;
+        }
+        self.nodes[child].parent = parent;
+        if (parent == NIL) {
+            self.root = child;
+        } else if (node == self.nodes[parent].left) {
+            self.nodes[parent].left = child;
+        } else {
+            self.nodes[parent].right = child;
+        }
+        self.nodes[child].right = node;
+        self.nodes[node].parent = child;
+    }
+
+    function replace(
+        Tree storage self,
+        uint256 _old,
+        uint256 _new
+    ) private {
+        if (self.root == _old) {
+            self.root = _new;
+            self.nodes[_new].parent = NIL;
+        } else {
+            uint256 parent = self.nodes[_old].parent;
+            self.nodes[_new].parent = parent;
+            if (self.nodes[parent].left == _old) {
+                self.nodes[parent].left = _new;
+            } else {
+                self.nodes[parent].right = _new;
+            }
+        }
+
+        uint256 left = self.nodes[_old].left;
+        uint256 right = self.nodes[_old].right;
+        self.nodes[_new].left = left;
+        self.nodes[left].parent = _new;
+        self.nodes[_new].right = right;
+        self.nodes[right].parent = _new;
+
+        self.nodes[_new].isRed = self.nodes[_old].isRed;
+    }
+
     function insert(Tree storage self, uint256 value) internal {
         require(value > 0, "RBT: value must be larger than 0");
         require(!contains(self, value), "RBT: Tree contains value");
@@ -166,7 +234,6 @@ library RedBlackTreeLib {
             self.nodes[parent].left = value;
         }
 
-        /// TODO Loop
         /// TODO use or drop cursor var
         uint256 current = value;
 
@@ -194,39 +261,16 @@ library RedBlackTreeLib {
                     if (current == self.nodes[parent].right) {
                         // case 5, inner child
                         // rotate parent and current
-                        self.nodes[grandparent].left = current;
-                        self.nodes[current].parent = grandparent;
-                        uint256 tmp_ = self.nodes[current].left;
-                        self.nodes[current].left = parent;
-                        self.nodes[parent].parent = current;
-                        self.nodes[parent].right = tmp_;
-                        if (tmp_ != NIL) {
-                            self.nodes[tmp_].parent = parent;
-                        }
+                        rotateLeft(self, parent);
 
                         // switch parent and current
-                        tmp_ = current;
+                        // tmp_ = current;
+                        uint256 tmp_ = current;
                         current = parent;
                         parent = tmp_;
                     }
                     // case 6, outer child
-                    if (self.root == grandparent) {
-                        self.root = parent;
-                    }
-                    uint256 grandgrandparent = self.nodes[grandparent].parent;
-                    uint256 tmp = self.nodes[parent].right;
-                    self.nodes[grandparent].left = tmp;
-                    if (tmp != NIL) {
-                        self.nodes[tmp].parent = grandparent;
-                    }
-                    self.nodes[parent].parent = grandgrandparent;
-                    if (self.nodes[grandgrandparent].left == grandparent) {
-                        self.nodes[grandgrandparent].left = parent;
-                    } else {
-                        self.nodes[grandgrandparent].right = parent;
-                    }
-                    self.nodes[parent].right = grandparent;
-                    self.nodes[grandparent].parent = parent;
+                    rotateRight(self, grandparent);
 
                     self.nodes[parent].isRed = false;
                     self.nodes[grandparent].isRed = true;
@@ -252,39 +296,15 @@ library RedBlackTreeLib {
                     if (current == self.nodes[parent].left) {
                         // case 5, inner child
                         // rotate parent and current
-                        self.nodes[grandparent].right = current;
-                        self.nodes[current].parent = grandparent;
-                        uint256 tmp_ = self.nodes[current].right;
-                        self.nodes[current].right = parent;
-                        self.nodes[parent].parent = current;
-                        self.nodes[parent].left = tmp_;
-                        if (tmp_ != NIL) {
-                            self.nodes[tmp_].parent = parent;
-                        }
+                        rotateRight(self, parent);
 
                         // switch parent and current
-                        tmp_ = current;
+                        uint256 tmp_ = current;
                         current = parent;
                         parent = tmp_;
                     }
                     // case 6, outer child
-                    if (self.root == grandparent) {
-                        self.root = parent;
-                    }
-                    uint256 grandgrandparent = self.nodes[grandparent].parent;
-                    uint256 tmp = self.nodes[parent].left;
-                    self.nodes[grandparent].right = tmp;
-                    if (tmp != NIL) {
-                        self.nodes[tmp].parent = grandparent;
-                    }
-                    self.nodes[parent].parent = grandgrandparent;
-                    if (self.nodes[grandgrandparent].left == grandparent) {
-                        self.nodes[grandgrandparent].left = parent;
-                    } else {
-                        self.nodes[grandgrandparent].right = parent;
-                    }
-                    self.nodes[parent].left = grandparent;
-                    self.nodes[grandparent].parent = parent;
+                    rotateLeft(self, grandparent);
 
                     self.nodes[parent].isRed = false;
                     self.nodes[grandparent].isRed = true;
@@ -313,8 +333,6 @@ library RedBlackTreeLib {
     }
 
     function _remove(Tree storage self, uint256 node_) private {
-        // TODO node_ is root
-
         if (self.nodes[node_].left == NIL) {
             // move right branch in its place
             if (self.nodes[node_].isRed) {
@@ -326,9 +344,25 @@ library RedBlackTreeLib {
             uint256 child = self.nodes[node_].right;
             if (child != NIL) {
                 removeSingleParent(self, node_, child);
+                return;
             }
 
-            // TODO no children
+            if (self.root == node_) {
+                delete self.nodes[node_];
+                self.root = NIL;
+                return;
+            }
+
+            handleRemoveFix(self, node_);
+
+            uint256 parent = self.nodes[node_].parent;
+            if (self.nodes[parent].left == node_) {
+                self.nodes[parent].left = NIL;
+            } else {
+                self.nodes[parent].right = NIL;
+            }
+
+            delete self.nodes[node_];
         } else if (self.nodes[node_].right == NIL) {
             // move left branch in its place
             if (self.nodes[node_].isRed) {
@@ -340,36 +374,145 @@ library RedBlackTreeLib {
             uint256 child = self.nodes[node_].left;
             if (child != NIL) {
                 removeSingleParent(self, node_, child);
+                return;
             }
 
-            // TODO no children
+            if (self.root == node_) {
+                delete self.nodes[node_];
+                self.root = NIL;
+                return;
+            }
+
+            handleRemoveFix(self, node_);
+
+            uint256 parent = self.nodes[node_].parent;
+            if (self.nodes[parent].left == node_) {
+                self.nodes[parent].left = NIL;
+            } else {
+                self.nodes[parent].right = NIL;
+            }
+
+            delete self.nodes[node_];
         } else {
             // node has two children
             // find the successor, replace it, and do repainting
             uint256 successor = min(self, self.nodes[node_].right);
             _remove(self, successor); // TODO entry is removed and then re-added
 
-            // TODO extract replace?
             // successor replaces node_
-            if (self.root == node_) {
-                self.root = successor;
-                self.nodes[successor].parent = NIL;
-            } else {
-                self.nodes[successor].parent = self.nodes[node_].parent;
-                if (self.nodes[self.nodes[node_].parent].left == node_) {
-                    self.nodes[self.nodes[node_].parent].left = successor;
-                } else {
-                    self.nodes[self.nodes[node_].parent].right = successor;
-                }
-            }
-            self.nodes[successor].left = self.nodes[node_].left;
-            self.nodes[self.nodes[node_].left].parent = successor;
-            self.nodes[successor].right = self.nodes[node_].right;
-            self.nodes[self.nodes[node_].right].parent = successor;
-
-            self.nodes[successor].isRed = self.nodes[node_].isRed;
+            replace(self, node_, successor);
 
             delete self.nodes[node_];
+        }
+    }
+
+    function handleRedDistantNephew(
+        Tree storage self,
+        uint parent,
+        uint sibling,
+        uint distantNephew,
+        bool isLeft
+    ) private {
+        if (isLeft) {
+            rotateLeft(self, parent);
+        } else {
+            rotateRight(self, parent);
+        }
+        self.nodes[sibling].isRed = self.nodes[parent].isRed;
+        self.nodes[parent].isRed = false;
+        self.nodes[distantNephew].isRed = false;
+    }
+
+    function handleRemoveFix(Tree storage self, uint256 current) private {
+        uint256 parent = self.nodes[current].parent;
+
+        while (parent != NIL && !self.nodes[current].isRed) {
+            if (self.nodes[parent].left == current) {
+                uint256 sibling = self.nodes[parent].right;
+                uint256 closeNephew = self.nodes[sibling].left;
+                uint256 distantNephew = self.nodes[sibling].right;
+
+                if (self.nodes[sibling].isRed) {
+                    // case 3: sibling red, parent and nephews are black
+                    rotateLeft(self, parent);
+                    self.nodes[parent].isRed = true;
+                    self.nodes[sibling].isRed = false;
+                    sibling = closeNephew;
+                    distantNephew = self.nodes[sibling].right;
+                    closeNephew = self.nodes[sibling].left;
+                }
+
+                if (distantNephew != NIL && self.nodes[distantNephew].isRed) {
+                    // case 6: distant nephew is red, sibling is black
+                    handleRedDistantNephew(self, parent, sibling, distantNephew, true);
+                    return;
+                }
+                if (closeNephew != NIL && self.nodes[closeNephew].isRed) {
+                    // case 5 closeNephew is red, sibling and distantNephew black
+                    rotateRight(self, sibling);
+                    self.nodes[sibling].isRed = true;
+                    self.nodes[closeNephew].isRed = false;
+
+                    distantNephew = sibling;
+                    sibling = closeNephew;
+                    // go case 6
+                    handleRedDistantNephew(self, parent, sibling, distantNephew, true);
+                    return;
+                }
+                if (self.nodes[parent].isRed) {
+                    // case 4: parent is red, sibling and nephew are black
+                    self.nodes[sibling].isRed = true;
+                    self.nodes[parent].isRed = false;
+                    return;
+                }
+                // case 2
+                // parent, sibling, and nephews are black
+                self.nodes[sibling].isRed = true;
+                current = parent;
+            } else {
+                uint256 sibling = self.nodes[parent].left;
+                uint256 closeNephew = self.nodes[sibling].right;
+                uint256 distantNephew = self.nodes[sibling].left;
+
+                if (self.nodes[sibling].isRed) {
+                    // case 3: sibling red, parent and nephews are black
+                    rotateRight(self, parent);
+                    self.nodes[parent].isRed = true;
+                    self.nodes[sibling].isRed = false;
+                    sibling = closeNephew;
+                    distantNephew = self.nodes[sibling].left;
+                    closeNephew = self.nodes[sibling].right;
+                }
+
+                if (distantNephew != NIL && self.nodes[distantNephew].isRed) {
+                    // case 6: distant nephew is red, sibling is black
+                    handleRedDistantNephew(self, parent, sibling, distantNephew, false);
+                    return;
+                }
+                if (closeNephew != NIL && self.nodes[closeNephew].isRed) {
+                    // case 5 closeNephew is red, sibling and distantNephew black
+                    rotateLeft(self, sibling);
+                    self.nodes[sibling].isRed = true;
+                    self.nodes[closeNephew].isRed = false;
+
+                    distantNephew = sibling;
+                    sibling = closeNephew;
+                    // go case 6
+                    handleRedDistantNephew(self, parent, sibling, distantNephew, false);
+                    return;
+                }
+                if (self.nodes[parent].isRed) {
+                    // case 4: parent is red, sibling and nephew are black
+                    self.nodes[sibling].isRed = true;
+                    self.nodes[parent].isRed = false;
+                    return;
+                }
+                // case 2
+                // parent, sibling, and nephews are black
+                self.nodes[sibling].isRed = true;
+                current = parent;
+            }
+            parent = self.nodes[current].parent;
         }
     }
 
