@@ -34,22 +34,42 @@ library RedBlackTreeLib {
         uint256 value = self.root;
         require(value != NIL, "RBT: Tree is empty");
 
-        while (self.nodes[value].left != NIL) {
-            value = self.nodes[value].left;
+        // min node from the root
+        return min(self, value);
+    }
+
+    function min(Tree storage self, uint256 node_)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 node = node_;
+        while (self.nodes[node].left != NIL) {
+            node = self.nodes[node].left;
         }
 
-        return value;
+        return node;
     }
 
     function last(Tree storage self) internal view returns (uint256) {
         uint256 value = self.root;
         require(value != NIL, "RBT: Tree is empty");
 
-        while (self.nodes[value].right != NIL) {
-            value = self.nodes[value].right;
+        // max node from the root
+        return max(self, value);
+    }
+
+    function max(Tree storage self, uint256 node_)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 node = node_;
+        while (self.nodes[node].right != NIL) {
+            node = self.nodes[node].right;
         }
 
-        return value;
+        return node;
     }
 
     function next(Tree storage self, uint256 node)
@@ -69,12 +89,7 @@ library RedBlackTreeLib {
         // find next as right branch
         uint256 value = self.nodes[node].right;
         if (value != NIL) {
-            uint256 next_ = self.nodes[value].left;
-            while (next_ != NIL) {
-                value = next_;
-                next_ = self.nodes[value].left;
-            }
-            return value;
+            return min(self, value);
         }
 
         // find next as parent
@@ -105,12 +120,7 @@ library RedBlackTreeLib {
     {
         uint256 value = self.nodes[node].left;
         if (value != NIL) {
-            uint256 next_ = self.nodes[value].right;
-            while (next_ != NIL) {
-                value = next_;
-                next_ = self.nodes[value].right;
-            }
-            return value;
+            return max(self, value);
         }
 
         value = node;
@@ -191,7 +201,7 @@ library RedBlackTreeLib {
                         self.nodes[parent].parent = current;
                         self.nodes[parent].right = tmp_;
                         if (tmp_ != NIL) {
-                          self.nodes[tmp_].parent = parent;
+                            self.nodes[tmp_].parent = parent;
                         }
 
                         // switch parent and current
@@ -207,7 +217,7 @@ library RedBlackTreeLib {
                     uint256 tmp = self.nodes[parent].right;
                     self.nodes[grandparent].left = tmp;
                     if (tmp != NIL) {
-                      self.nodes[tmp].parent = grandparent;
+                        self.nodes[tmp].parent = grandparent;
                     }
                     self.nodes[parent].parent = grandgrandparent;
                     if (self.nodes[grandgrandparent].left == grandparent) {
@@ -249,7 +259,7 @@ library RedBlackTreeLib {
                         self.nodes[parent].parent = current;
                         self.nodes[parent].left = tmp_;
                         if (tmp_ != NIL) {
-                          self.nodes[tmp_].parent = parent;
+                            self.nodes[tmp_].parent = parent;
                         }
 
                         // switch parent and current
@@ -265,7 +275,7 @@ library RedBlackTreeLib {
                     uint256 tmp = self.nodes[parent].left;
                     self.nodes[grandparent].right = tmp;
                     if (tmp != NIL) {
-                      self.nodes[tmp].parent = grandparent;
+                        self.nodes[tmp].parent = grandparent;
                     }
                     self.nodes[parent].parent = grandgrandparent;
                     if (self.nodes[grandgrandparent].left == grandparent) {
@@ -295,8 +305,111 @@ library RedBlackTreeLib {
         }
     }
 
-    function remove(Tree storage self, uint256 value) internal {
-        require(contains(self, value), "RBT: Tree does not contain value");
+    function remove(Tree storage self, uint256 node_) internal {
+        require(contains(self, node_), "RBT: Tree does not contain node_");
         self.size--;
+
+        _remove(self, node_);
+    }
+
+    function _remove(Tree storage self, uint256 node_) private {
+        // TODO node_ is root
+
+        if (self.nodes[node_].left == NIL) {
+            // move right branch in its place
+            if (self.nodes[node_].isRed) {
+                // a red node cannot have just one child, thus it has no children
+                removeRedSingle(self, node_);
+                return;
+            }
+            // node_ has max one child, thus node_ is black and the child is red
+            uint256 child = self.nodes[node_].right;
+            if (child != NIL) {
+                removeSingleParent(self, node_, child);
+            }
+
+            // TODO no children
+        } else if (self.nodes[node_].right == NIL) {
+            // move left branch in its place
+            if (self.nodes[node_].isRed) {
+                // a red node cannot have just one child, thus it has no children
+                removeRedSingle(self, node_);
+                return;
+            }
+            // node_ has max one child, thus node_ is black and the child is red
+            uint256 child = self.nodes[node_].left;
+            if (child != NIL) {
+                removeSingleParent(self, node_, child);
+            }
+
+            // TODO no children
+        } else {
+            // node has two children
+            // find the successor, replace it, and do repainting
+            uint256 successor = min(self, self.nodes[node_].right);
+            _remove(self, successor); // TODO entry is removed and then re-added
+
+            // TODO extract replace?
+            // successor replaces node_
+            if (self.root == node_) {
+                self.root = successor;
+                self.nodes[successor].parent = NIL;
+            } else {
+                self.nodes[successor].parent = self.nodes[node_].parent;
+                if (self.nodes[self.nodes[node_].parent].left == node_) {
+                    self.nodes[self.nodes[node_].parent].left = successor;
+                } else {
+                    self.nodes[self.nodes[node_].parent].right = successor;
+                }
+            }
+            self.nodes[successor].left = self.nodes[node_].left;
+            self.nodes[self.nodes[node_].left].parent = successor;
+            self.nodes[successor].right = self.nodes[node_].right;
+            self.nodes[self.nodes[node_].right].parent = successor;
+
+            self.nodes[successor].isRed = self.nodes[node_].isRed;
+
+            delete self.nodes[node_];
+        }
+    }
+
+    function removeRedSingle(Tree storage self, uint256 node_) private {
+        if (self.root == node_) {
+            // a single red node is the root (can only occur through rotations)
+            self.root = NIL;
+        } else {
+            // TODO similar drop from parent
+            uint256 parent = self.nodes[node_].parent;
+            if (self.nodes[parent].left == node_) {
+                self.nodes[parent].left = NIL;
+            } else {
+                self.nodes[parent].right = NIL;
+            }
+        }
+        delete self.nodes[node_];
+    }
+
+    function removeSingleParent(
+        Tree storage self,
+        uint256 node_,
+        uint256 child
+    ) private {
+        if (self.root == node_) {
+            self.root = child;
+            self.nodes[child].parent = NIL;
+        } else {
+            // TODO similar drop from parent
+            uint256 parent = self.nodes[node_].parent;
+            if (self.nodes[parent].left == node_) {
+                self.nodes[parent].left = child;
+            } else {
+                self.nodes[parent].right = child;
+            }
+            self.nodes[child].parent = parent;
+        }
+        // the red child must be painted black
+        self.nodes[child].isRed = false;
+        // drop the node struct
+        delete self.nodes[node_];
     }
 }
